@@ -1,0 +1,61 @@
+# NPM 发布忽略文件配置
+# 注意：此文件与 .gitignore 不同
+# src/VERSION.json 需要被包含在 npm 包中，因此不在此列表
+
+# Node 模块
+node_modules/
+
+# 系统文件
+.DS_Store
+*.swp
+*.swo
+*~
+Thumbs.db
+
+# Git 相关
+.git/
+.gitignore
+.gitattributes
+
+# 环境变量
+.env
+.env.*
+
+# 本地配置文件
+.claude-git-hook.json
+.claude/
+
+# 开发脚本（用户安装后不需要）
+scripts/
+
+# 测试文件
+test/
+test-repos/
+*.test.js
+coverage/
+
+# 日志文件
+logs/
+*.log
+
+# 编辑器配置
+.vscode/
+.idea/
+*.sublime-*
+.editorconfig
+
+# CI/CD 配置
+.github/
+.gitlab-ci.yml
+.travis.yml
+circle.yml
+
+# 临时文件
+*.tmp
+*.bak
+*.old
+
+# 文档草稿
+docs/drafts/
+*.draft.md
+

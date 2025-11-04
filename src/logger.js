@@ -39,33 +39,6 @@ function getInstallRoot() {
     return process.env.CC_GIT_HOOK_INSTALL_ROOT;
   }
   
-  // 通过 __dirname 判断
-  // 如果当前文件在 src 目录下，向上两级就是安装根目录
-  const currentDir = __dirname;
-  const basename = path.basename(currentDir);
-  
-  if (process.env.DEBUG) {
-    console.error(`[DEBUG] getInstallRoot: __dirname=${currentDir}, basename=${basename}`);
-  }
-  
-  // 如果当前目录名是 'src'，说明在安装目录的 src 子目录下
-  if (basename === 'src') {
-    const root = path.dirname(currentDir);
-    if (process.env.DEBUG) {
-      console.error(`[DEBUG] getInstallRoot: 当前目录是 src，使用父目录 ${root}`);
-    }
-    return root;
-  }
-  
-  // 如果当前目录的父目录有 src 子目录，说明在项目根目录
-  const parentDir = path.dirname(currentDir);
-  if (fs.existsSync(path.join(parentDir, 'src'))) {
-    if (process.env.DEBUG) {
-      console.error(`[DEBUG] getInstallRoot: 父目录有 src 子目录，使用 ${parentDir}`);
-    }
-    return parentDir;
-  }
-  
   // 默认使用用户主目录下的安装目录
   const defaultRoot = path.join(os.homedir(), '.claude-code-git-hook');
   if (process.env.DEBUG) {
