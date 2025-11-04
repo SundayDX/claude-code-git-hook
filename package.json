@@ -1,0 +1,55 @@
+{
+  "name": "claude-code-git-hook",
+  "version": "1.0.0",
+  "description": "Git hook tool for Claude Code - automatic WIP commits and squash-wip command",
+  "main": "src/splash.js",
+  "bin": {
+    "cc-git-hook": "./src/cc-git-hook.js"
+  },
+  "scripts": {
+    "test": "node test/run-all-tests.js",
+    "test:auto-commit": "node test/test-auto-commit.js",
+    "test:squash-wip": "node test/test-squash-wip.js",
+    "test:all": "node test/run-all-tests.js",
+    "version": "node -e \"console.log(require('./package.json').version)\""
+  },
+  "keywords": [
+    "claude-code",
+    "git",
+    "hook",
+    "wip",
+    "commit",
+    "automation",
+    "version-control",
+    "claude",
+    "ai",
+    "devops"
+  ],
+  "author": {
+    "name": "SundayDX",
+    "url": "https://github.com/SundayDX"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SundayDX/claude-code-git-hook.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SundayDX/claude-code-git-hook/issues"
+  },
+  "homepage": "https://github.com/SundayDX/claude-code-git-hook#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^2.0.0"
+  },
+  "files": [
+    "src/",
+    "examples/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ]
+}
+

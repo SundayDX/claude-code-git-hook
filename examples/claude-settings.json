@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/src/auto-commit.js",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
+

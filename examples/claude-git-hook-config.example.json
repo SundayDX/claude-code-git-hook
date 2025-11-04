@@ -1,0 +1,22 @@
+{
+  "_comment": "这是配置文件的示例，复制到项目根目录或用户主目录并重命名为 .claude-git-hook.json",
+  "autoCommit": {
+    "enabled": true,
+    "prefix": "[AUTO-WIP]",
+    "includeFileSummary": true,
+    "maxMessageLength": 100
+  },
+  "squashWip": {
+    "autoGenerateMessage": true,
+    "showPreview": true
+  },
+  "git": {
+    "autoStage": true,
+    "safeMode": true
+  },
+  "debug": {
+    "enabled": false,
+    "verbose": false
+  }
+}
+

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-git-hook-config",
+  "autoCommit": {
+    "enabled": true,
+    "prefix": "[AUTO-WIP]",
+    "includeFileSummary": true,
+    "maxMessageLength": 100
+  },
+  "squashWip": {
+    "autoGenerateMessage": true,
+    "showPreview": true
+  },
+  "git": {
+    "autoStage": true,
+    "safeMode": true
+  },
+  "debug": {
+    "enabled": false,
+    "verbose": false
+  }
+}
+
