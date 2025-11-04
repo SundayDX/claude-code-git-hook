@@ -6,66 +6,8 @@
 set -e
 
 # ============================================================================
-# 路径解析：获取脚本和项目目录
-# ============================================================================
-
-# 获取脚本所在目录的绝对路径
-# 使用 ${BASH_SOURCE[0]} 是最可靠的方式（在 bash 中）
-# 如果不可用，回退到 $0
-if [ -n "${BASH_SOURCE[0]}" ]; then
-    # bash 中推荐使用 BASH_SOURCE
-    SCRIPT_FILE="${BASH_SOURCE[0]}"
-else
-    # 其他 shell 使用 $0
-    SCRIPT_FILE="$0"
-fi
-
-# 将脚本路径转换为绝对路径
-# 如果已经是绝对路径，直接使用；如果是相对路径，转换为绝对路径
-if [ "${SCRIPT_FILE#/}" = "$SCRIPT_FILE" ]; then
-    # 相对路径：基于当前工作目录转换
-    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_FILE")" && pwd)"
-    SCRIPT_FILE="$SCRIPT_DIR/$(basename "$SCRIPT_FILE")"
-else
-    # 已经是绝对路径
-    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_FILE")" && pwd)"
-fi
-
-# 处理符号链接（如果脚本本身是符号链接）
-# macOS 的 readlink 不支持 -f，所以使用循环处理
-if [ -L "$SCRIPT_FILE" ]; then
-    # 解析符号链接
-    while [ -L "$SCRIPT_FILE" ]; do
-        LINK_TARGET="$(readlink "$SCRIPT_FILE" 2>/dev/null || echo "$SCRIPT_FILE")"
-        if [ "${LINK_TARGET#/}" = "$LINK_TARGET" ]; then
-            # 相对路径的符号链接，需要基于链接所在目录解析
-            SCRIPT_FILE="$(cd "$SCRIPT_DIR" && pwd)/$LINK_TARGET"
-        else
-            # 绝对路径的符号链接
-            SCRIPT_FILE="$LINK_TARGET"
-        fi
-        SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_FILE")" && pwd)"
-    done
-fi
-
-# 项目根目录是 scripts 目录的父目录
-PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-
-# 验证项目目录是否正确
-if [ ! -f "$PROJECT_DIR/src/cc-git-hook.js" ]; then
-    echo "❌ 错误: 无法找到项目文件 $PROJECT_DIR/src/cc-git-hook.js"
-    echo "   当前检测到的项目目录: $PROJECT_DIR"
-    echo "   脚本目录: $SCRIPT_DIR"
-    exit 1
-fi
-
-# ============================================================================
 # 安装目录选择
 # ============================================================================
-
-# 安装目录结构：
-# - INSTALL_ROOT: 项目文件安装位置（~/.claude-code-git-hook/）
-# - BIN_DIR: 命令符号链接位置（~/.local/bin 或 ~/bin）
 
 # 项目安装根目录（存储实际文件）
 if [ -n "$CC_GIT_HOOK_INSTALL_ROOT" ]; then
@@ -105,14 +47,61 @@ if ! mkdir -p "$BIN_DIR" 2>/dev/null; then
 fi
 
 # ============================================================================
-# 开始安装
+# 检查并更新项目目录
 # ============================================================================
 
 echo "🚀 安装 Claude Code Git Hook Tool..."
-echo "   源代码目录: $PROJECT_DIR"
 echo "   安装目录: $INSTALL_ROOT"
 echo "   命令链接: $BIN_DIR/cc-git-hook"
 echo ""
+
+# 检查 git 是否可用
+if ! command -v git &> /dev/null; then
+    echo "❌ 错误: 需要 Git 才能安装此工具"
+    echo "   请先安装 Git"
+    exit 1
+fi
+
+# 检查安装目录是否存在且是 git 仓库
+if [ -d "$INSTALL_ROOT/.git" ]; then
+    # 已存在 git 仓库，更新它
+    echo "📥 检测到已存在的安装，正在更新..."
+    cd "$INSTALL_ROOT"
+    if ! git pull --quiet 2>/dev/null; then
+        echo "⚠️  更新失败，尝试重新克隆..."
+        cd "$(dirname "$INSTALL_ROOT")"
+        rm -rf "$INSTALL_ROOT"
+        git clone --depth 1 https://github.com/SundayDX/claude-code-git-hook.git "$INSTALL_ROOT"
+        echo "✅ 重新克隆完成"
+    else
+        echo "✅ 更新完成"
+    fi
+elif [ -d "$INSTALL_ROOT" ] && [ "$(ls -A "$INSTALL_ROOT" 2>/dev/null)" ]; then
+    # 目录存在但不是 git 仓库，重新克隆
+    echo "⚠️  安装目录已存在但不是 git 仓库，正在重新克隆..."
+    cd "$(dirname "$INSTALL_ROOT")"
+    rm -rf "$INSTALL_ROOT"
+    git clone --depth 1 https://github.com/SundayDX/claude-code-git-hook.git "$INSTALL_ROOT"
+    echo "✅ 克隆完成"
+else
+    # 目录不存在，克隆仓库
+    echo "📥 正在下载项目..."
+    cd "$(dirname "$INSTALL_ROOT")"
+    if ! git clone --depth 1 https://github.com/SundayDX/claude-code-git-hook.git "$INSTALL_ROOT" 2>/dev/null; then
+        echo "❌ 错误: 无法克隆仓库"
+        echo "   请检查网络连接或稍后重试"
+        exit 1
+    fi
+    echo "✅ 下载完成"
+fi
+
+echo ""
+
+# 验证项目目录是否正确
+if [ ! -f "$INSTALL_ROOT/src/cc-git-hook.js" ]; then
+    echo "❌ 错误: 无法找到项目文件 $INSTALL_ROOT/src/cc-git-hook.js"
+    exit 1
+fi
 
 # ============================================================================
 # 检查依赖
@@ -132,43 +121,19 @@ if [ "$NODE_VERSION" -lt 14 ]; then
 fi
 
 # ============================================================================
-# 复制项目文件到安装目录
+# 设置文件执行权限
 # ============================================================================
 
-echo "📦 复制项目文件到安装目录..."
+echo "⚙️  设置文件权限..."
 
-# 需要复制的文件和目录
 INSTALL_SRC_DIR="$INSTALL_ROOT/src"
 
-# 如果安装目录已存在，询问是否覆盖
-if [ -d "$INSTALL_ROOT" ] && [ "$(ls -A "$INSTALL_ROOT" 2>/dev/null)" ]; then
-    echo "⚠️  检测到已存在的安装: $INSTALL_ROOT"
-    echo "   将更新到新版本..."
-fi
-
-# 复制 src 目录（包含所有源代码）
-echo "   复制 src 目录..."
-if [ -d "$INSTALL_SRC_DIR" ]; then
-    rm -rf "$INSTALL_SRC_DIR"
-fi
-mkdir -p "$INSTALL_SRC_DIR"
-cp -r "$PROJECT_DIR/src"/* "$INSTALL_SRC_DIR/"
-
-# 复制 package.json（如果需要读取版本信息等）
-if [ -f "$PROJECT_DIR/package.json" ]; then
-    cp "$PROJECT_DIR/package.json" "$INSTALL_ROOT/"
-fi
-
-# 设置文件执行权限
-echo "   设置文件权限..."
 chmod +x "$INSTALL_SRC_DIR/cc-git-hook.js"
 chmod +x "$INSTALL_SRC_DIR/auto-commit.js"
 chmod +x "$INSTALL_SRC_DIR/splash.js"
 chmod +x "$INSTALL_SRC_DIR/doctor.js"
 chmod +x "$INSTALL_SRC_DIR/version.js"
 chmod +x "$INSTALL_SRC_DIR/upgrade.js"
-
-echo "✅ 文件复制完成"
 
 # ============================================================================
 # 创建命令符号链接
