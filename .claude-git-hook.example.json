@@ -1,0 +1,27 @@
+{
+  "autoCommit": {
+    "enabled": true,
+    "prefix": "[AUTO-WIP]",
+    "includeFileSummary": true,
+    "maxMessageLength": 100
+  },
+  "squashWip": {
+    "autoGenerateMessage": true,
+    "showPreview": true
+  },
+  "git": {
+    "autoStage": true,
+    "safeMode": true
+  },
+  "debug": {
+    "enabled": false,
+    "verbose": false
+  },
+  "logging": {
+    "enabled": true,
+    "level": "info",
+    "verbose": false,
+    "filePath": null
+  }
+}
+

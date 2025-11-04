@@ -5,14 +5,14 @@
  * 合并多个 [AUTO-WIP] commits 为一个正式 commit
  */
 
-const { query } = require('@anthropic-ai/claude-code');
-const gitUtils = require('./git-utils');
-const { execSync } = require('child_process');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const readline = require('readline');
-const logger = require('./logger').defaultLogger;
+import { query } from '@anthropic-ai/claude-code';
+import * as gitUtils from './git-utils.js';
+import { execSync } from 'child_process';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import readline from 'readline';
+import { defaultLogger as logger } from './logger.js';
 
 /**
  * 询问用户是否初始化 git 仓库
@@ -400,7 +400,7 @@ if (require.main === module) {
   });
 }
 
-module.exports = {
+export {
   main,
   buildMergedPrompt,
   generateMergedCommitMessage,

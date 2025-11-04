@@ -5,9 +5,9 @@
  * 提供安全的 git 命令执行和状态检查功能
  */
 
-const { execSync } = require('child_process');
-const path = require('path');
-const logger = require('./logger').defaultLogger;
+import { execSync } from 'child_process';
+import path from 'path';
+import { defaultLogger as logger } from './logger.js';
 
 /**
  * 检查当前目录是否是 git 仓库
@@ -359,7 +359,7 @@ function getGitChanges() {
   }
 }
 
-module.exports = {
+export {
   isGitRepository,
   initGitRepository,
   execGitCommand,

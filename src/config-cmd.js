@@ -5,8 +5,8 @@
  * 支持查看、设置和管理配置项
  */
 
-const config = require('./config');
-const path = require('path');
+import * as config from './config.js';
+import path from 'path';
 
 /**
  * 验证日志级别
@@ -208,11 +208,11 @@ function main(...args) {
 }
 
 // 如果直接运行此脚本
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main(...process.argv.slice(2));
 }
 
-module.exports = {
+export {
   main,
 };
 

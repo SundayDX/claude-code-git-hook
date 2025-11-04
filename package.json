@@ -2,6 +2,7 @@
   "name": "claude-code-git-hook",
   "version": "1.0.0",
   "description": "Git hook tool for Claude Code - automatic WIP commits and squash-wip command",
+  "type": "module",
   "main": "src/splash.js",
   "bin": {
     "cc-git-hook": "./src/cc-git-hook.js"

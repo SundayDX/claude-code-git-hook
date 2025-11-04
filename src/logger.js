@@ -6,10 +6,15 @@
  * 支持同时输出到控制台和文件
  */
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const config = require('./config');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import * as config from './config.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * 日志级别定义（数字越小优先级越高）
@@ -233,7 +238,7 @@ function createLogger(loggerConfig = null) {
 // 导出默认日志实例（使用配置文件）
 const defaultLogger = createLogger();
 
-module.exports = {
+export {
   createLogger,
   defaultLogger,
   LOG_LEVELS,

@@ -5,9 +5,9 @@
  * 支持从配置文件和环境变量读取配置
  */
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 /**
  * 默认配置
@@ -33,7 +33,7 @@ const defaultConfig = {
   },
   logging: {
     enabled: true, // 是否启用日志输出
-    level: 'error', // 日志级别: 'error', 'warn', 'info', 'debug'（默认：error）
+    level: 'info', // 日志级别: 'error', 'warn', 'info', 'debug'（默认：info，便于跟踪）
     verbose: false, // 详细模式：输出更多调试信息
     filePath: null, // 日志文件路径（null 表示使用默认路径：安装目录/logs/YYYY-MM-DD.log）
   },
@@ -216,7 +216,7 @@ function setConfig(key, value, useUserConfig = false) {
   }
 }
 
-module.exports = {
+export {
   loadConfig,
   saveConfig,
   getConfig,

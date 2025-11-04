@@ -5,13 +5,19 @@
  * 检查并自动升级工具到最新版本
  */
 
-const https = require('https');
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import https from 'https';
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import readline from 'readline';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-const version = require('./version');
+import * as version from './version.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * 比较版本号
@@ -164,14 +170,31 @@ async function performUpgrade() {
           stdio: 'inherit',
           encoding: 'utf8'
         });
-        console.log('\n✅ 更新完成！');
-        console.log('\n提示: 如果命令符号链接需要更新，请运行：');
-        console.log(`  bash ${path.join(installRoot, 'scripts', 'install.sh')}`);
+        console.log('✅ 代码更新完成！');
+        
+        // 更新 npm 依赖
+        console.log('\n📦 更新 npm 依赖...');
+        try {
+          execSync('npm install --production', { 
+            cwd: installRoot, 
+            stdio: 'inherit',
+            encoding: 'utf8'
+          });
+          console.log('✅ 依赖更新完成！');
+        } catch (npmError) {
+          console.warn('\n⚠️  npm 依赖更新失败:', npmError.message);
+          console.log('请手动运行: cd', installRoot, '&& npm install');
+          // 不中断，继续执行
+        }
+        
+        console.log('\n✅ 升级完成！');
+        console.log('\n当前版本:', version.getVersion());
       } catch (error) {
         console.error('\n❌ Git pull 失败:', error.message);
         console.log('\n请手动运行以下命令：');
         console.log(`  cd ${installRoot}`);
         console.log('  git pull');
+        console.log('  npm install --production');
         process.exit(1);
       }
     } else {
@@ -198,7 +221,6 @@ async function main() {
   
   // 直接执行升级（参考 install.sh，直接 git pull）
   // 询问是否升级
-  const readline = require('readline');
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -226,7 +248,7 @@ async function main() {
 }
 
 // 如果直接运行此脚本
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(error => {
     console.error('未处理的错误:', error.message);
     if (process.env.DEBUG) {
@@ -236,7 +258,7 @@ if (require.main === module) {
   });
 }
 
-module.exports = {
+export {
   main,
   getLatestVersion,
   compareVersions,

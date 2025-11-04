@@ -5,16 +5,16 @@
  * 支持二级命令结构
  */
 
-const path = require('path');
+import path from 'path';
 
-// 命令映射
+// 命令映射 (使用动态 import)
 const commands = {
-  'squash-wip': () => require('./splash'),
-  'auto-commit': () => require('./auto-commit'),
-  'doctor': () => require('./doctor'),
-  'version': () => require('./version'),
-  'upgrade': () => require('./upgrade'),
-  'config': () => require('./config-cmd'),
+  'squash-wip': () => import('./splash.js'),
+  'auto-commit': () => import('./auto-commit.js'),
+  'doctor': () => import('./doctor.js'),
+  'version': () => import('./version.js'),
+  'upgrade': () => import('./upgrade.js'),
+  'config': () => import('./config-cmd.js'),
 };
 
 /**
@@ -74,7 +74,7 @@ async function main() {
 
   // 加载对应的命令模块
   try {
-    const commandModule = commands[command]();
+    const commandModule = await commands[command]();
     
     if (!commandModule || typeof commandModule.main !== 'function') {
       console.error(`错误: 命令 "${command}" 模块未导出 main 函数`);
@@ -112,7 +112,7 @@ async function main() {
 }
 
 // 如果是直接执行，运行主函数
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(error => {
     console.error('未处理的错误:', error.message);
     if (process.env.DEBUG) {
@@ -122,5 +122,5 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main };
+export { main };
 

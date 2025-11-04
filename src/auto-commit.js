@@ -5,11 +5,11 @@
  * 在 Stop 事件时自动创建 [AUTO-WIP] commit
  */
 
-const { query } = require('@anthropic-ai/claude-code');
-const gitUtils = require('./git-utils');
-const config = require('./config');
-const readline = require('readline');
-const logger = require('./logger').defaultLogger;
+import { query } from '@anthropic-ai/claude-code';
+import * as gitUtils from './git-utils.js';
+import * as config from './config.js';
+import readline from 'readline';
+import { defaultLogger as logger } from './logger.js';
 
 /**
  * 构建用于生成 commit 消息的 prompt
@@ -75,13 +75,13 @@ async function generateCommitMessage(hookInput, changes) {
   const maxRetries = 3;
   const timeout = 30000;
   
+  logger.info('开始生成 commit 消息...');
   const prompt = buildPrompt(hookInput, changes);
+  logger.debug(`Prompt 长度: ${prompt.length} 字符`);
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      if (appConfig.debug.enabled) {
-        logger.debug(`🤖 正在生成 commit 消息 (尝试 ${attempt}/${maxRetries})...`);
-      }
+      logger.info(`🤖 正在调用 Claude Code SDK 生成消息 (尝试 ${attempt}/${maxRetries})...`);
       
       const result = await Promise.race([
         query(prompt),
@@ -107,13 +107,16 @@ async function generateCommitMessage(hookInput, changes) {
         message = message.substring(0, maxLength - 3) + '...';
       }
       
+      logger.info(`✓ 成功生成 commit 消息 (第 ${attempt} 次尝试)`);
+      logger.debug(`消息内容: ${message}`);
       return message;
     } catch (error) {
+      logger.warn(`⚠️ 第 ${attempt} 次尝试失败: ${error.message}`);
+      
       if (attempt === maxRetries) {
         // 最后一次尝试失败，使用后备方案
-        if (appConfig.debug.enabled) {
-          logger.warn(`⚠️ 生成 commit 消息失败，使用后备方案: ${error.message}`);
-        }
+        logger.warn(`⚠️ 所有尝试均失败，使用后备方案生成 commit 消息`);
+        logger.debug(`错误详情: ${error.stack}`);
         
         const userPrompt = hookInput.prompt || hookInput.user_prompt || '';
         const timestamp = new Date().toLocaleString('zh-CN', {
@@ -209,18 +212,20 @@ function main() {
  */
 async function processHookInput(hookInput) {
   try {
+    logger.info('=== 开始处理 auto-commit ===');
     const appConfig = config.loadConfig();
+    logger.debug(`配置已加载: autoCommit.enabled=${appConfig.autoCommit.enabled}`);
     
     // 检查是否启用自动 commit
     if (!appConfig.autoCommit.enabled) {
-      if (appConfig.debug.enabled) {
-        logger.debug('自动 commit 已禁用');
-      }
+      logger.info('自动 commit 已禁用，退出');
       process.exit(0);
     }
     
     // 检查是否是 git 仓库
+    logger.info('检查 git 仓库状态...');
     if (!gitUtils.isGitRepository()) {
+      logger.warn('当前目录不是 git 仓库');
       // 不是 git 仓库
       // 如果是交互式模式，询问用户是否初始化
       if (process.stdin.isTTY && process.stdout.isTTY) {
@@ -248,27 +253,29 @@ async function processHookInput(hookInput) {
     }
     
     // 检查 git 状态
+    logger.info('检查 git 变更状态...');
     const status = gitUtils.getGitStatus();
+    logger.debug(`状态: hasChanges=${status.hasChanges}, staged=${status.staged}, unstaged=${status.unstaged}`);
     
     if (!status.hasChanges) {
       // 没有变更，不需要 commit
-      if (appConfig.debug.enabled) {
-        logger.debug('没有未提交的变更');
-      }
+      logger.info('没有未提交的变更，退出');
       process.exit(0);
     }
+    
+    logger.info('检测到变更，继续处理...');
     
     // 暂存所有变更（在获取变更信息之前）
     try {
       if (appConfig.git.autoStage) {
+        logger.info('暂存所有变更 (git add -A)...');
         gitUtils.execGitCommand('add -A', { 
           silent: !appConfig.debug.verbose,
         });
+        logger.info('✓ 变更已暂存');
       }
     } catch (error) {
-      if (appConfig.debug.enabled || !appConfig.git.safeMode) {
-        logger.warn('警告: 暂存文件失败:', error.message);
-      }
+      logger.warn('警告: 暂存文件失败:', error.message);
       if (!appConfig.git.safeMode) {
         process.exit(1);
       }
@@ -276,14 +283,14 @@ async function processHookInput(hookInput) {
     }
     
     // 获取完整的 git 变更信息
+    logger.info('获取 git 变更信息...');
     let changes;
     try {
       changes = gitUtils.getGitChanges();
+      logger.debug(`变更信息长度: ${changes.length} 字符`);
     } catch (error) {
       // 如果获取失败，使用简单的摘要
-      if (appConfig.debug.enabled) {
-        logger.warn('警告: 获取 git 变更信息失败，使用简单摘要:', error.message);
-      }
+      logger.warn('警告: 获取 git 变更信息失败，使用简单摘要:', error.message);
       const filesSummary = gitUtils.getChangedFilesSummary();
       changes = `变更摘要: ${filesSummary || '未知变更'}`;
     }
@@ -292,41 +299,38 @@ async function processHookInput(hookInput) {
     const commitMessage = await generateCommitMessage(hookInput, changes);
     
     // 创建 commit
+    logger.info('创建 git commit...');
     try {
       gitUtils.execGitCommand(`commit -m "${commitMessage.replace(/"/g, '\\"')}"`, {
         silent: !appConfig.debug.verbose,
       });
       
       // 成功创建 commit
-      if (appConfig.debug.enabled) {
-        logger.info(`✓ 已创建 commit: ${commitMessage}`);
-      }
+      logger.info(`✓ 已创建 commit: ${commitMessage}`);
     } catch (error) {
       // commit 失败可能是没有变更或已是最新状态
-      if (appConfig.debug.enabled) {
-        logger.warn('警告: 创建 commit 失败:', error.message);
-      }
+      logger.warn('警告: 创建 commit 失败:', error.message);
       if (!appConfig.git.safeMode) {
         process.exit(1);
       }
     }
     
+    logger.info('=== auto-commit 完成 ===');
     process.exit(0);
   } catch (error) {
     // 任何错误都不应该中断 Claude Code
-    if (process.env.DEBUG) {
-      logger.error('错误:', error.message);
-    }
+    logger.error('错误:', error.message);
+    logger.debug(`错误堆栈: ${error.stack}`);
     process.exit(0);
   }
 }
 
 // 如果直接运行此脚本
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   main();
 }
 
-module.exports = {
+export {
   main,
   buildPrompt,
   generateCommitMessage,

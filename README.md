@@ -22,11 +22,17 @@
 
 #### 方法一：安装脚本（推荐，最简单）
 
-使用一键安装脚本：
+使用一键安装脚本（**自动安装依赖**）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SundayDX/claude-code-git-hook/main/scripts/install.sh | bash
 ```
+
+安装脚本会自动：
+- ✅ 下载最新代码
+- ✅ 安装 npm 依赖（`@anthropic-ai/claude-code`）
+- ✅ 配置命令行工具
+- ✅ 设置 Claude Code Hook
 
 或者从本地项目安装：
 
@@ -35,7 +41,7 @@ curl -fsSL https://raw.githubusercontent.com/SundayDX/claude-code-git-hook/main/
 git clone https://github.com/SundayDX/claude-code-git-hook.git
 cd claude-code-git-hook
 
-# 运行安装脚本
+# 运行安装脚本（自动安装依赖）
 bash scripts/install.sh
 ```
 
@@ -46,9 +52,11 @@ cc-git-hook squash-wip [message]  # 合并 WIP commits
 cc-git-hook auto-commit            # 手动运行 auto-commit
 cc-git-hook doctor                 # 诊断工具，检查安装和配置状态
 cc-git-hook version                # 显示版本号
-cc-git-hook upgrade                # 检查并升级到最新版本
+cc-git-hook upgrade                # 检查并升级（自动更新依赖）
 cc-git-hook help                   # 显示帮助信息
 ```
+
+**注意**：`upgrade` 命令会自动更新 npm 依赖，确保工具始终使用最新版本。
 
 **安装位置说明**：
 - 项目文件安装到：`~/.claude-code-git-hook/`（可通过环境变量 `CC_GIT_HOOK_INSTALL_ROOT` 自定义）
