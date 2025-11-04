@@ -8,6 +8,9 @@
 import https from 'https';
 import { execSync } from 'child_process';
 import readline from 'readline';
+import os from 'os';
+import path from 'path';
+import fs from 'fs';
 import * as version from './version.js';
 
 /**
@@ -17,6 +20,12 @@ const UPGRADE_MODE = {
   STABLE: 'stable',   // 升级到最新 release
   LATEST: 'latest',   // 升级到最新 commit
 };
+
+/**
+ * 仓库相关常量
+ */
+const REPO_DIR = path.join(os.homedir(), '.claude-code-git-hook');
+const REPO_URL = 'https://github.com/SundayDX/claude-code-git-hook.git';
 
 /**
  * 比较版本号
@@ -176,66 +185,87 @@ function compareWithCommit(localHash, remoteCommit) {
 }
 
 /**
+ * 检查目录是否为 git 仓库
+ * @param {string} dir - 目录路径
+ * @returns {boolean} 是否为 git 仓库
+ */
+function isGitRepository(dir) {
+  try {
+    const gitDir = path.join(dir, '.git');
+    return fs.existsSync(gitDir) && fs.statSync(gitDir).isDirectory();
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * 确保仓库目录存在且为最新
+ * @returns {Promise<void>}
+ */
+async function ensureRepository() {
+  console.log(`📁 检查仓库目录: ${REPO_DIR}`);
+  
+  // 检查目录是否存在
+  if (!fs.existsSync(REPO_DIR)) {
+    // 目录不存在，执行克隆
+    console.log('📥 目录不存在，正在克隆仓库...');
+    execSync(`git clone ${REPO_URL} "${REPO_DIR}"`, {
+      stdio: 'inherit'
+    });
+    console.log('✅ 仓库克隆完成');
+    return;
+  }
+  
+  // 目录存在，检查是否为 git 仓库
+  if (!isGitRepository(REPO_DIR)) {
+    // 不是 git 仓库，删除后重新克隆
+    console.log('⚠️  目录存在但不是 git 仓库，将删除并重新克隆...');
+    execSync(`rm -rf "${REPO_DIR}"`, { stdio: 'pipe' });
+    execSync(`git clone ${REPO_URL} "${REPO_DIR}"`, {
+      stdio: 'inherit'
+    });
+    console.log('✅ 仓库克隆完成');
+    return;
+  }
+  
+  // 是 git 仓库，重置并更新
+  console.log('🔄 更新现有仓库...');
+  execSync('git reset --hard HEAD', {
+    cwd: REPO_DIR,
+    stdio: 'pipe'
+  });
+  execSync('git pull', {
+    cwd: REPO_DIR,
+    stdio: 'inherit'
+  });
+  console.log('✅ 仓库更新完成');
+}
+
+/**
  * 执行升级
  */
 async function performUpgrade() {
   console.log('\n开始升级...\n');
   
   try {
-    // 使用 npm update -g 升级
-    console.log('📦 正在升级 claude-code-git-hook...');
+    // 确保仓库目录存在且为最新
+    await ensureRepository();
     
-    try {
-      // 先尝试从 GitHub 安装最新版
-      console.log('📥 从 GitHub 获取最新版本...');
-      
-      // 创建临时目录
-      const tempDir = execSync('mktemp -d', { encoding: 'utf8' }).trim();
-      
-      // 克隆仓库
-      execSync(
-        'git clone --depth 1 https://github.com/SundayDX/claude-code-git-hook.git .',
-        { 
-          cwd: tempDir,
-          stdio: 'pipe'
-        }
-      );
-      
-      // 打包
-      execSync('npm pack --silent', { cwd: tempDir, stdio: 'pipe' });
-      
-      // 获取包文件名
-      const packageFile = execSync('ls claude-code-git-hook-*.tgz', {
-        cwd: tempDir,
-        encoding: 'utf8'
-      }).trim();
-      
-      // 全局安装
-      console.log('🔧 安装新版本...');
-      execSync(`npm install -g "${tempDir}/${packageFile}"`, {
-        stdio: 'inherit'
-      });
-      
-      // 清理临时目录
-      execSync(`rm -rf "${tempDir}"`);
-      
-      console.log('\n✅ 升级完成！');
-      console.log(`\n当前版本: v${version.getVersion()}`);
-    } catch (error) {
-      console.error('\n❌ 从 GitHub 升级失败，尝试从 npm 升级...');
-      
-      // 回退到 npm update
-      execSync('npm update -g claude-code-git-hook', {
-        stdio: 'inherit'
-      });
-      
-      console.log('\n✅ 升级完成！');
-      console.log(`\n当前版本: v${version.getVersion()}`);
-    }
+    // 在仓库目录执行全局安装
+    console.log('\n📦 正在安装 claude-code-git-hook...');
+    execSync('npm install -g .', {
+      cwd: REPO_DIR,
+      stdio: 'inherit'
+    });
+    
+    console.log('\n✅ 升级完成！');
+    console.log(`\n当前版本: v${version.getVersion()}`);
   } catch (error) {
     console.error('\n❌ 升级失败:', error.message);
     console.log('\n请尝试手动升级：');
-    console.log('  npm install -g claude-code-git-hook@latest');
+    console.log(`  1. cd ${REPO_DIR}`);
+    console.log('  2. git pull');
+    console.log('  3. npm install -g .');
     process.exit(1);
   }
 }
