@@ -28,20 +28,6 @@ for OLD_LINK in "${OLD_LINKS[@]}"; do
     fi
 done
 
-# 检查并删除旧的安装目录（基于 git clone 的方式）
-OLD_INSTALL_DIR="$HOME/.claude-code-git-hook"
-if [ -d "$OLD_INSTALL_DIR/.git" ]; then
-    echo "   检测到旧的 git clone 安装方式"
-    read -p "   是否删除旧的安装目录 $OLD_INSTALL_DIR? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        rm -rf "$OLD_INSTALL_DIR"
-        echo "   ✅ 已删除旧的安装目录"
-    else
-        echo "   ⚠️  保留旧目录，但可能会有冲突"
-    fi
-fi
-
 echo ""
 
 # ============================================================================
@@ -79,43 +65,55 @@ fi
 # ============================================================================
 
 INSTALL_FROM_GITHUB=${INSTALL_FROM_GITHUB:-true}
+INSTALL_DIR="$HOME/.claude-code-git-hook"
 
 if [ "$INSTALL_FROM_GITHUB" = "true" ]; then
     # 从 GitHub 安装
     echo "📦 从 GitHub 安装最新版本..."
+    echo "📁 安装目录: $INSTALL_DIR"
     echo ""
     
-    # 创建临时目录
-    TEMP_DIR=$(mktemp -d)
-    cd "$TEMP_DIR"
-    
-    # 克隆仓库
-    echo "📥 正在下载..."
-    if ! git clone --depth 1 https://github.com/SundayDX/claude-code-git-hook.git . 2>/dev/null; then
-        echo "❌ 错误: 无法克隆仓库"
-        echo "   请检查网络连接或稍后重试"
-        rm -rf "$TEMP_DIR"
-        exit 1
+    # 检查目录是否存在
+    if [ -d "$INSTALL_DIR" ]; then
+        if [ -d "$INSTALL_DIR/.git" ]; then
+            # 已存在 git 仓库，更新代码
+            echo "📁 检测到现有安装，正在更新..."
+            cd "$INSTALL_DIR"
+            git reset --hard HEAD > /dev/null 2>&1
+            git pull
+        else
+            # 目录存在但不是 git 仓库，删除重建
+            echo "⚠️  目录存在但不是 git 仓库，将重新安装..."
+            rm -rf "$INSTALL_DIR"
+            echo "📥 正在克隆仓库..."
+            if ! git clone https://github.com/SundayDX/claude-code-git-hook.git "$INSTALL_DIR"; then
+                echo "❌ 错误: 无法克隆仓库"
+                echo "   请检查网络连接或稍后重试"
+                exit 1
+            fi
+            cd "$INSTALL_DIR"
+        fi
+    else
+        # 目录不存在，克隆仓库
+        echo "📥 正在克隆仓库..."
+        if ! git clone https://github.com/SundayDX/claude-code-git-hook.git "$INSTALL_DIR"; then
+            echo "❌ 错误: 无法克隆仓库"
+            echo "   请检查网络连接或稍后重试"
+            exit 1
+        fi
+        cd "$INSTALL_DIR"
     fi
     
-    # 打包并全局安装
-    echo "📦 打包项目..."
-    npm pack --silent > /dev/null
-    
-    PACKAGE_FILE=$(ls claude-code-git-hook-*.tgz)
-    
+    # 全局安装
     echo "🔧 全局安装..."
-    npm install -g "$PACKAGE_FILE" --silent
-    
-    # 清理临时目录
-    cd - > /dev/null
-    rm -rf "$TEMP_DIR"
+    npm install -g . --silent
 else
     # 从 npm registry 安装（如果已发布）
     echo "📦 从 npm 安装..."
     npm install -g claude-code-git-hook
 fi
 
+echo ""
 echo "✅ 安装完成！"
 echo ""
 
