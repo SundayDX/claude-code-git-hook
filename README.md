@@ -45,8 +45,15 @@ bash scripts/install.sh
 cc-git-hook squash-wip [message]  # 合并 WIP commits
 cc-git-hook auto-commit            # 手动运行 auto-commit
 cc-git-hook doctor                 # 诊断工具，检查安装和配置状态
+cc-git-hook version                # 显示版本号
+cc-git-hook upgrade                # 检查并升级到最新版本
 cc-git-hook help                   # 显示帮助信息
 ```
+
+**安装位置说明**：
+- 项目文件安装到：`~/.claude-code-git-hook/`（可通过环境变量 `CC_GIT_HOOK_INSTALL_ROOT` 自定义）
+- 命令符号链接到：`~/.local/bin/cc-git-hook`（可通过环境变量 `CC_GIT_HOOK_BIN_DIR` 自定义）
+- 安装后完全独立，不依赖原始源代码位置
 
 #### 方法二：克隆项目（手动安装）
 
@@ -54,15 +61,25 @@ cc-git-hook help                   # 显示帮助信息
 git clone https://github.com/SundayDX/claude-code-git-hook.git
 cd claude-code-git-hook
 
-# 创建符号链接到全局 PATH
-sudo ln -s $(pwd)/src/cc-git-hook.js /usr/local/bin/cc-git-hook
+# 运行安装脚本（推荐）
+bash scripts/install.sh
+```
 
-# 或使用用户本地 bin 目录（无需 sudo）
+或者手动复制安装：
+
+```bash
+# 1. 复制项目文件到用户目录
+mkdir -p ~/.claude-code-git-hook
+cp -r src ~/.claude-code-git-hook/
+cp package.json ~/.claude-code-git-hook/
+
+# 2. 创建命令符号链接到 PATH
 mkdir -p ~/.local/bin
-ln -s $(pwd)/src/cc-git-hook.js ~/.local/bin/cc-git-hook
+ln -s ~/.claude-code-git-hook/src/cc-git-hook.js ~/.local/bin/cc-git-hook
 
-# 确保 ~/.local/bin 在 PATH 中
+# 3. 确保 ~/.local/bin 在 PATH 中
 export PATH="$HOME/.local/bin:$PATH"
+# 将此行添加到 ~/.bashrc 或 ~/.zshrc 使其永久生效
 ```
 
 #### 方法三：直接使用（无需安装）
@@ -106,6 +123,26 @@ Doctor 命令会自动检查：
 **首次配置**：
 
 安装脚本会自动配置全局 Hook。如果你需要手动配置或使用项目级配置，Doctor 会提供详细的配置说明和修复建议。
+
+**升级安装**：
+
+如果有新版本，可以使用以下方式升级：
+
+```bash
+# 方法一：使用 upgrade 命令（如果已安装）
+cc-git-hook upgrade
+
+# 方法二：重新运行安装脚本（推荐）
+# 从 GitHub 获取最新版本
+curl -fsSL https://raw.githubusercontent.com/SundayDX/claude-code-git-hook/main/scripts/install.sh | bash
+
+# 或从本地项目更新
+cd claude-code-git-hook
+git pull
+bash scripts/install.sh
+```
+
+安装脚本会自动更新 `~/.claude-code-git-hook/` 目录中的文件。
 
 **Squash WIP 命令**：
 
@@ -327,20 +364,39 @@ cc-git-hook doctor
 
 Doctor 命令会自动检查所有配置并提供修复建议。这是验证安装和配置的最简单方法。
 
+**安装验证清单**：
+- ✅ 项目文件已复制到 `~/.claude-code-git-hook/`
+- ✅ 命令符号链接已创建到 `~/.local/bin/cc-git-hook`
+- ✅ 命令目录在 PATH 中（如果不在，脚本会提示如何添加）
+- ✅ 全局 Hook 配置已设置（`~/.claude/settings.json`）
+
+**更新安装**：
+如果需要更新到新版本，只需重新运行安装脚本：
+```bash
+bash scripts/install.sh
+```
+脚本会自动覆盖旧的安装文件。
+
 ### 卸载
 
 如果需要卸载：
 
 ```bash
-# 删除符号链接（全局安装）
-sudo rm /usr/local/bin/cc-git-hook
-
-# 或从用户本地 bin 删除（本地安装）
+# 1. 删除命令符号链接
 rm ~/.local/bin/cc-git-hook
+# 或如果安装在 /usr/local/bin
+# sudo rm /usr/local/bin/cc-git-hook
 
-# 可选：删除全局 Hook 配置
+# 2. 删除安装目录（包含所有项目文件）
+rm -rf ~/.claude-code-git-hook
+
+# 3. 可选：删除全局 Hook 配置
 rm ~/.claude/settings.json
 ```
+
+**注意**：如果通过环境变量自定义了安装目录，请删除对应的目录：
+- `CC_GIT_HOOK_INSTALL_ROOT` 指定的安装目录
+- `CC_GIT_HOOK_BIN_DIR` 中创建的符号链接
 
 ## 📋 系统要求
 
