@@ -143,16 +143,6 @@ function getFullVersionInfo() {
     }
   }
   
-  // 生成显示格式
-  let display = `v${version}`;
-  if (hash) {
-    if (commits > 0) {
-      display = `v${version}+${commits}-${hash}`;
-    } else {
-      display = `v${version}-${hash}`;
-    }
-  }
-  
   // 格式化日期
   let date = null;
   if (timestamp) {
@@ -161,6 +151,20 @@ function getFullVersionInfo() {
     } catch (e) {
       date = null;
     }
+  }
+  
+  // 生成显示格式：日期+commits数量+hash
+  let display = hash || `v${version}`;
+  if (hash && date) {
+    const dateStr = date.replace(/-/g, '.'); // 2025.11.04
+    if (commits > 0) {
+      display = `${dateStr}+${commits}-${hash}`;
+    } else {
+      display = `${dateStr}-${hash}`;
+    }
+  } else if (hash) {
+    // 如果有 hash 但没有日期，使用 hash
+    display = hash;
   }
   
   return {
