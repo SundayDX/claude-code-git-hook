@@ -251,8 +251,15 @@ async function performUpgrade() {
     // 确保仓库目录存在且为最新
     await ensureRepository();
     
+    // 安装项目依赖
+    console.log('\n📦 安装项目依赖...');
+    execSync('npm install', {
+      cwd: REPO_DIR,
+      stdio: 'inherit'
+    });
+    
     // 在仓库目录执行全局安装
-    console.log('\n📦 正在安装 claude-code-git-hook...');
+    console.log('\n🔧 正在安装 claude-code-git-hook...');
     execSync('npm install -g .', {
       cwd: REPO_DIR,
       stdio: 'inherit'

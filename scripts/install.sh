@@ -104,6 +104,10 @@ if [ "$INSTALL_FROM_GITHUB" = "true" ]; then
         cd "$INSTALL_DIR"
     fi
     
+    # 安装项目依赖
+    echo "📦 安装项目依赖..."
+    npm install --silent
+    
     # 全局安装
     echo "🔧 全局安装..."
     npm install -g . --silent
