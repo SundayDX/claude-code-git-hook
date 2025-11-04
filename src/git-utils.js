@@ -7,6 +7,7 @@
 
 const { execSync } = require('child_process');
 const path = require('path');
+const logger = require('./logger').defaultLogger;
 
 /**
  * 检查当前目录是否是 git 仓库
@@ -17,6 +18,35 @@ function isGitRepository() {
     execSync('git rev-parse --git-dir', { stdio: 'ignore' });
     return true;
   } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * 初始化 git 仓库
+ * @param {Object} options - 初始化选项
+ * @param {string} options.cwd - 工作目录（可选，默认当前目录）
+ * @returns {boolean} 是否成功
+ */
+function initGitRepository(options = {}) {
+  const { cwd } = options;
+  
+  try {
+    // 先检查是否已经是 git 仓库
+    if (isGitRepository()) {
+      return true;
+    }
+    
+    // 执行 git init
+    execSync('git init', {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+      cwd: cwd || process.cwd(),
+    });
+    
+    return true;
+  } catch (error) {
+    logger.error('初始化 git 仓库失败:', error.message);
     return false;
   }
 }
@@ -41,8 +71,8 @@ function execGitCommand(command, options = {}) {
     return result ? result.trim() : '';
   } catch (error) {
     if (!silent) {
-      console.error(`Git 命令执行失败: git ${command}`);
-      console.error(error.message);
+      logger.error(`Git 命令执行失败: git ${command}`);
+      logger.error(error.message);
     }
     throw error;
   }
@@ -331,6 +361,7 @@ function getGitChanges() {
 
 module.exports = {
   isGitRepository,
+  initGitRepository,
   execGitCommand,
   getGitStatus,
   getDiffStat,

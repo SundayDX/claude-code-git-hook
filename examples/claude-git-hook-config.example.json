@@ -17,6 +17,11 @@
   "debug": {
     "enabled": false,
     "verbose": false
+  },
+  "logging": {
+    "enabled": true,
+    "level": "info",
+    "verbose": false
   }
 }
 

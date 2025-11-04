@@ -31,6 +31,11 @@ const defaultConfig = {
     enabled: false,
     verbose: false,
   },
+  logging: {
+    enabled: true, // 是否启用日志输出
+    level: 'info', // 日志级别: 'error', 'warn', 'info', 'debug'
+    verbose: false, // 详细模式：输出更多调试信息
+  },
 };
 
 /**

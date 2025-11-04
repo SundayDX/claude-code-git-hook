@@ -11,6 +11,26 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const readline = require('readline');
+const logger = require('./logger').defaultLogger;
+
+/**
+ * 询问用户是否初始化 git 仓库
+ * @returns {Promise<boolean>} 用户是否同意初始化
+ */
+function askToInitGitRepository() {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    
+    rl.question('当前目录不是 git 仓库。是否要初始化 git 仓库？(y/n): ', (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes');
+    });
+  });
+}
 
 /**
  * 构建用于生成合并 commit 消息的 prompt
@@ -67,7 +87,7 @@ async function generateMergedCommitMessage(wipCommits) {
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🤖 正在生成合并 commit 消息 (尝试 ${attempt}/${maxRetries})...`);
+      logger.debug(`🤖 正在生成合并 commit 消息 (尝试 ${attempt}/${maxRetries})...`);
       
       const result = await Promise.race([
         query(prompt),
@@ -91,7 +111,7 @@ async function generateMergedCommitMessage(wipCommits) {
     } catch (error) {
       if (attempt === maxRetries) {
         // 最后一次尝试失败，使用后备方案
-        console.error(`⚠️ 生成合并 commit 消息失败，使用后备方案: ${error.message}`);
+        logger.warn(`⚠️ 生成合并 commit 消息失败，使用后备方案: ${error.message}`);
         
         // 提取所有操作描述
         const descriptions = wipCommits.map(commit => {
@@ -209,12 +229,12 @@ function performRebase(baseCommit, wipCommits, commitMessage) {
       return true;
     } catch (error) {
       // rebase 可能失败，检查是否需要手动处理
-      console.error('\n警告: 自动 rebase 失败，可能需要手动处理。');
-      console.error('错误信息:', error.message);
+      logger.warn('\n警告: 自动 rebase 失败，可能需要手动处理。');
+      logger.warn('错误信息:', error.message);
       return false;
     }
   } catch (error) {
-    console.error('错误: 执行 rebase 时出错:', error.message);
+    logger.error('错误: 执行 rebase 时出错:', error.message);
     return false;
   } finally {
     // 清理临时文件
@@ -247,7 +267,7 @@ function performSimpleMerge(wipCommits, commitMessage) {
     // 保存当前变更
     const hasChanges = gitUtils.getGitStatus().hasChanges;
     if (hasChanges) {
-      console.log('检测到未提交的变更，先暂存...');
+      logger.debug('检测到未提交的变更，先暂存...');
       gitUtils.execGitCommand('stash push -m "claude-code-splash-temp"', { silent: true });
     }
     
@@ -266,13 +286,13 @@ function performSimpleMerge(wipCommits, commitMessage) {
         gitUtils.execGitCommand('stash pop', { silent: true });
       } catch (error) {
         // stash pop 可能失败，但这不是致命错误
-        console.log('警告: 恢复暂存变更时出现问题，请手动检查。');
+        logger.warn('警告: 恢复暂存变更时出现问题，请手动检查。');
       }
     }
     
     return true;
   } catch (error) {
-    console.error('错误: 合并 commits 失败:', error.message);
+    logger.error('错误: 合并 commits 失败:', error.message);
     return false;
   }
 }
@@ -289,8 +309,21 @@ async function main(customMessage) {
   
   // 检查是否是 git 仓库
   if (!gitUtils.isGitRepository()) {
-    console.error('错误: 当前目录不是 git 仓库。');
-    process.exit(1);
+    // 询问用户是否初始化
+    const shouldInit = await askToInitGitRepository();
+    if (shouldInit) {
+      if (gitUtils.initGitRepository()) {
+        console.log('✅ 已初始化 git 仓库');
+        // 继续执行后续流程
+      } else {
+        console.error('❌ 初始化 git 仓库失败');
+        process.exit(1);
+      }
+    } else {
+      // 用户拒绝初始化，退出
+      console.log('未初始化 git 仓库，退出。');
+      process.exit(1);
+    }
   }
   
   // 查找基准 commit（最后一个非 WIP commit）
@@ -359,9 +392,9 @@ async function main(customMessage) {
 // 如果直接运行此脚本（向后兼容）
 if (require.main === module) {
   main().catch(error => {
-    console.error('未处理的错误:', error.message);
+    logger.error('未处理的错误:', error.message);
     if (process.env.DEBUG) {
-      console.error(error.stack);
+      logger.error(error.stack);
     }
     process.exit(1);
   });

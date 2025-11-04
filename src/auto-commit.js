@@ -8,6 +8,8 @@
 const { query } = require('@anthropic-ai/claude-code');
 const gitUtils = require('./git-utils');
 const config = require('./config');
+const readline = require('readline');
+const logger = require('./logger').defaultLogger;
 
 /**
  * 构建用于生成 commit 消息的 prompt
@@ -38,6 +40,30 @@ function buildPrompt(hookInput, changes) {
 }
 
 /**
+ * 询问用户是否初始化 git 仓库（仅在交互式模式下）
+ * @returns {Promise<boolean>} 用户是否同意初始化
+ */
+function askToInitGitRepository() {
+  return new Promise((resolve) => {
+    // 只在交互式模式下询问
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      resolve(false);
+      return;
+    }
+    
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    
+    rl.question('当前目录不是 git 仓库。是否要初始化 git 仓库？(y/n): ', (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes');
+    });
+  });
+}
+
+/**
  * 使用 Claude Code SDK 生成 commit 消息
  * @param {Object} hookInput - Hook 输入
  * @param {string} changes - Git 变更信息
@@ -54,7 +80,7 @@ async function generateCommitMessage(hookInput, changes) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       if (appConfig.debug.enabled) {
-        console.log(`🤖 正在生成 commit 消息 (尝试 ${attempt}/${maxRetries})...`);
+        logger.debug(`🤖 正在生成 commit 消息 (尝试 ${attempt}/${maxRetries})...`);
       }
       
       const result = await Promise.race([
@@ -86,7 +112,7 @@ async function generateCommitMessage(hookInput, changes) {
       if (attempt === maxRetries) {
         // 最后一次尝试失败，使用后备方案
         if (appConfig.debug.enabled) {
-          console.error(`⚠️ 生成 commit 消息失败，使用后备方案: ${error.message}`);
+          logger.warn(`⚠️ 生成 commit 消息失败，使用后备方案: ${error.message}`);
         }
         
         const userPrompt = hookInput.prompt || hookInput.user_prompt || '';
@@ -148,7 +174,7 @@ function main() {
       } catch (error) {
         // JSON 解析失败，使用空对象继续
         if (process.env.DEBUG) {
-          console.error('警告: 无法解析 hook 输入 JSON:', error.message);
+          logger.warn('警告: 无法解析 hook 输入 JSON:', error.message);
         }
         processHookInput({});
       }
@@ -156,7 +182,7 @@ function main() {
     
     stdin.on('error', (error) => {
       if (process.env.DEBUG) {
-        console.error('警告: 读取 stdin 时出错:', error.message);
+        logger.warn('警告: 读取 stdin 时出错:', error.message);
       }
       processHookInput({});
     });
@@ -171,7 +197,7 @@ function main() {
   } catch (error) {
     // 任何错误都不应该中断 Claude Code
     if (process.env.DEBUG) {
-      console.error('错误: 处理 hook 输入时出错:', error.message);
+      logger.error('错误: 处理 hook 输入时出错:', error.message);
     }
     processHookInput({});
   }
@@ -188,18 +214,37 @@ async function processHookInput(hookInput) {
     // 检查是否启用自动 commit
     if (!appConfig.autoCommit.enabled) {
       if (appConfig.debug.enabled) {
-        console.log('自动 commit 已禁用');
+        logger.debug('自动 commit 已禁用');
       }
       process.exit(0);
     }
     
     // 检查是否是 git 仓库
     if (!gitUtils.isGitRepository()) {
-      // 不是 git 仓库，静默退出
-      if (appConfig.debug.enabled) {
-        console.log('当前目录不是 git 仓库');
+      // 不是 git 仓库
+      // 如果是交互式模式，询问用户是否初始化
+      if (process.stdin.isTTY && process.stdout.isTTY) {
+        const shouldInit = await askToInitGitRepository();
+        if (shouldInit) {
+          if (gitUtils.initGitRepository()) {
+            console.log('✅ 已初始化 git 仓库');
+            // 继续执行后续流程
+          } else {
+            console.error('❌ 初始化 git 仓库失败');
+            process.exit(1);
+          }
+        } else {
+          // 用户拒绝初始化，退出
+          console.log('未初始化 git 仓库，退出。');
+          process.exit(0);
+        }
+      } else {
+        // 非交互式模式（hook 调用），静默退出
+        if (appConfig.debug.enabled) {
+          logger.debug('当前目录不是 git 仓库');
+        }
+        process.exit(0);
       }
-      process.exit(0);
     }
     
     // 检查 git 状态
@@ -208,7 +253,7 @@ async function processHookInput(hookInput) {
     if (!status.hasChanges) {
       // 没有变更，不需要 commit
       if (appConfig.debug.enabled) {
-        console.log('没有未提交的变更');
+        logger.debug('没有未提交的变更');
       }
       process.exit(0);
     }
@@ -222,7 +267,7 @@ async function processHookInput(hookInput) {
       }
     } catch (error) {
       if (appConfig.debug.enabled || !appConfig.git.safeMode) {
-        console.error('警告: 暂存文件失败:', error.message);
+        logger.warn('警告: 暂存文件失败:', error.message);
       }
       if (!appConfig.git.safeMode) {
         process.exit(1);
@@ -237,7 +282,7 @@ async function processHookInput(hookInput) {
     } catch (error) {
       // 如果获取失败，使用简单的摘要
       if (appConfig.debug.enabled) {
-        console.error('警告: 获取 git 变更信息失败，使用简单摘要:', error.message);
+        logger.warn('警告: 获取 git 变更信息失败，使用简单摘要:', error.message);
       }
       const filesSummary = gitUtils.getChangedFilesSummary();
       changes = `变更摘要: ${filesSummary || '未知变更'}`;
@@ -254,12 +299,12 @@ async function processHookInput(hookInput) {
       
       // 成功创建 commit
       if (appConfig.debug.enabled) {
-        console.log(`✓ 已创建 commit: ${commitMessage}`);
+        logger.info(`✓ 已创建 commit: ${commitMessage}`);
       }
     } catch (error) {
       // commit 失败可能是没有变更或已是最新状态
       if (appConfig.debug.enabled) {
-        console.error('警告: 创建 commit 失败:', error.message);
+        logger.warn('警告: 创建 commit 失败:', error.message);
       }
       if (!appConfig.git.safeMode) {
         process.exit(1);
@@ -270,7 +315,7 @@ async function processHookInput(hookInput) {
   } catch (error) {
     // 任何错误都不应该中断 Claude Code
     if (process.env.DEBUG) {
-      console.error('错误:', error.message);
+      logger.error('错误:', error.message);
     }
     process.exit(0);
   }
