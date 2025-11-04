@@ -3,8 +3,12 @@
 /**
  * 日志工具模块
  * 支持配置化的日志输出，根据配置决定是否输出日志
+ * 支持同时输出到控制台和文件
  */
 
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 const config = require('./config');
 
 /**
@@ -18,18 +22,133 @@ const LOG_LEVELS = {
 };
 
 /**
+ * 获取安装根目录
+ * @returns {string} 安装根目录路径
+ */
+function getInstallRoot() {
+  // 优先使用环境变量
+  if (process.env.CC_GIT_HOOK_INSTALL_ROOT) {
+    return process.env.CC_GIT_HOOK_INSTALL_ROOT;
+  }
+  
+  // 通过 __dirname 判断
+  // 如果当前文件在 src 目录下，向上两级就是安装根目录
+  const currentDir = __dirname;
+  const basename = path.basename(currentDir);
+  
+  // 如果当前目录名是 'src'，说明在安装目录的 src 子目录下
+  if (basename === 'src') {
+    return path.dirname(currentDir);
+  }
+  
+  // 如果当前目录的父目录有 src 子目录，说明在项目根目录
+  const parentDir = path.dirname(currentDir);
+  if (fs.existsSync(path.join(parentDir, 'src'))) {
+    return parentDir;
+  }
+  
+  // 默认使用用户主目录下的安装目录
+  return path.join(os.homedir(), '.claude-code-git-hook');
+}
+
+/**
+ * 确保日志目录存在
+ * @param {string} logDir - 日志目录路径
+ * @returns {boolean} 是否成功
+ */
+function ensureLogDir(logDir) {
+  try {
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    return true;
+  } catch (error) {
+    // 静默失败，不影响主程序运行
+    return false;
+  }
+}
+
+/**
+ * 获取日志文件路径
+ * @param {string|null} configFilePath - 配置的日志文件路径
+ * @returns {string|null} 日志文件路径，如果不需要文件日志则返回 null
+ */
+function getLogFilePath(configFilePath) {
+  // 如果配置中指定了文件路径，使用配置的路径
+  if (configFilePath) {
+    return configFilePath;
+  }
+  
+  // 使用默认路径：安装目录/logs/YYYY-MM-DD.log
+  const installRoot = getInstallRoot();
+  const logsDir = path.join(installRoot, 'logs');
+  
+  // 确保 logs 目录存在
+  if (!ensureLogDir(logsDir)) {
+    return null;
+  }
+  
+  // 生成按日期的日志文件名
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+  const logFileName = `${dateStr}.log`;
+  
+  return path.join(logsDir, logFileName);
+}
+
+/**
+ * 写入日志到文件
+ * @param {string} logFilePath - 日志文件路径
+ * @param {string} level - 日志级别
+ * @param {...any} args - 日志参数
+ */
+function writeToFile(logFilePath, level, ...args) {
+  if (!logFilePath) {
+    return;
+  }
+  
+  try {
+    const timestamp = new Date().toISOString();
+    const message = args.map(arg => {
+      if (typeof arg === 'object') {
+        try {
+          return JSON.stringify(arg);
+        } catch (e) {
+          return String(arg);
+        }
+      }
+      return String(arg);
+    }).join(' ');
+    
+    const logLine = `[${timestamp}] [${level.toUpperCase()}] ${message}\n`;
+    
+    // 追加写入文件
+    fs.appendFileSync(logFilePath, logLine, 'utf8');
+  } catch (error) {
+    // 静默失败，不影响主程序运行
+    // 仅在调试模式下输出错误
+    if (process.env.DEBUG) {
+      console.error(`写入日志文件失败: ${error.message}`);
+    }
+  }
+}
+
+/**
  * 创建日志工具实例
  * @param {Object} loggerConfig - 日志配置（可选，默认从配置文件读取）
  * @returns {Object} 日志工具对象
  */
 function createLogger(loggerConfig = null) {
   const appConfig = config.loadConfig();
-  const logConfig = loggerConfig || appConfig.logging || { enabled: true, level: 'info', verbose: false };
+  const logConfig = loggerConfig || appConfig.logging || { enabled: true, level: 'error', verbose: false, filePath: null };
   
   const enabled = logConfig.enabled !== false; // 默认启用
-  const level = logConfig.level || 'info';
+  const level = logConfig.level || 'error';
   const verboseMode = logConfig.verbose || false;
-  const minLevel = LOG_LEVELS[level] !== undefined ? LOG_LEVELS[level] : LOG_LEVELS.info;
+  const minLevel = LOG_LEVELS[level] !== undefined ? LOG_LEVELS[level] : LOG_LEVELS.error;
+  
+  // 获取日志文件路径
+  const logFilePath = getLogFilePath(logConfig.filePath);
   
   /**
    * 检查是否应该输出日志
@@ -40,7 +159,7 @@ function createLogger(loggerConfig = null) {
     if (!enabled) {
       return false;
     }
-    const currentLevel = LOG_LEVELS[logLevel] !== undefined ? LOG_LEVELS[logLevel] : LOG_LEVELS.info;
+    const currentLevel = LOG_LEVELS[logLevel] !== undefined ? LOG_LEVELS[logLevel] : LOG_LEVELS.error;
     return currentLevel <= minLevel;
   }
   
@@ -51,6 +170,7 @@ function createLogger(loggerConfig = null) {
   function error(...args) {
     if (shouldLog('error')) {
       console.error(...args);
+      writeToFile(logFilePath, 'error', ...args);
     }
   }
   
@@ -61,6 +181,7 @@ function createLogger(loggerConfig = null) {
   function warn(...args) {
     if (shouldLog('warn')) {
       console.warn(...args);
+      writeToFile(logFilePath, 'warn', ...args);
     }
   }
   
@@ -71,6 +192,7 @@ function createLogger(loggerConfig = null) {
   function info(...args) {
     if (shouldLog('info')) {
       console.log(...args);
+      writeToFile(logFilePath, 'info', ...args);
     }
   }
   
@@ -81,6 +203,7 @@ function createLogger(loggerConfig = null) {
   function debug(...args) {
     if (shouldLog('debug') || verboseMode) {
       console.log(...args);
+      writeToFile(logFilePath, 'debug', ...args);
     }
   }
   
@@ -91,6 +214,7 @@ function createLogger(loggerConfig = null) {
   function verbose(...args) {
     if (verboseMode) {
       console.log(...args);
+      writeToFile(logFilePath, 'verbose', ...args);
     }
   }
   

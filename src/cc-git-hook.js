@@ -14,6 +14,7 @@ const commands = {
   'doctor': () => require('./doctor'),
   'version': () => require('./version'),
   'upgrade': () => require('./upgrade'),
+  'config': () => require('./config-cmd'),
 };
 
 /**
@@ -32,6 +33,7 @@ Claude Code Git Hook Tool
   doctor                 诊断工具，检查安装和配置状态
   version                显示当前版本号
   upgrade                检查并升级到最新版本
+  config                 配置管理命令（查看和设置配置项）
   help                   显示此帮助信息
 
 示例:
@@ -40,6 +42,8 @@ Claude Code Git Hook Tool
   cc-git-hook doctor                      # 检查安装状态
   cc-git-hook version                     # 显示版本号
   cc-git-hook upgrade                     # 检查并升级
+  cc-git-hook config set logging.level debug  # 设置日志级别
+  cc-git-hook config get logging.level       # 查看日志级别
 
 更多信息请访问: https://github.com/SundayDX/claude-code-git-hook
 `);
@@ -91,6 +95,9 @@ async function main() {
     } else if (command === 'upgrade') {
       // upgrade 是异步的
       await commandModule.main();
+    } else if (command === 'config') {
+      // config 命令传递参数数组
+      commandModule.main(...commandArgs);
     } else {
       // 其他命令：直接调用，传递参数数组
       commandModule.main(...commandArgs);
