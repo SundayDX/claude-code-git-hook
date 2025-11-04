@@ -207,6 +207,30 @@ EOF
 
 echo ""
 echo "✅ 安装完成！"
+# ============================================================================
+# 配置 Slash 命令
+# ============================================================================
+
+echo "📝 配置 slash 命令..."
+
+COMMANDS_DIR="$CLAUDE_DIR/commands"
+mkdir -p "$COMMANDS_DIR"
+
+# 复制 squash-wip 命令定义
+if [ -f "$INSTALL_DIR/.claude/commands/squash-wip.md" ]; then
+  cp "$INSTALL_DIR/.claude/commands/squash-wip.md" "$COMMANDS_DIR/squash-wip.md"
+  echo "✅ Slash 命令已配置: /squash-wip"
+else
+  echo "⚠️  警告: 未找到 squash-wip 命令定义文件"
+  echo "   您可以手动创建 ~/.claude/commands/squash-wip.md"
+fi
+
+echo ""
+
+# ============================================================================
+# 安装完成
+# ============================================================================
+
 echo ""
 echo "现在可以使用以下命令："
 echo "  cc-git-hook squash-wip [message]  # 合并 WIP commits"
@@ -218,5 +242,5 @@ echo "  cc-git-hook help                   # 显示帮助信息"
 echo ""
 echo "📝 下一步："
 echo "1. 运行 cc-git-hook doctor 检查安装状态"
-echo "2. 在项目中使用 /squash-wip 命令"
+echo "2. 在 Claude Code 中使用 /squash-wip 命令"
 echo ""

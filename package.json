@@ -51,6 +51,7 @@
   "files": [
     "src/",
     "examples/",
+    ".claude/",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"

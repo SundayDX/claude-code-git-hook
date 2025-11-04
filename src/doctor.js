@@ -358,6 +358,86 @@ function generateSuggestions(checks) {
 }
 
 /**
+ * 检查 Slash 命令配置
+ */
+function checkSlashCommands() {
+  logSection('检查 Slash 命令配置');
+  
+  const commandsDir = path.join(os.homedir(), '.claude', 'commands');
+  const squashWipCommand = path.join(commandsDir, 'squash-wip.md');
+  
+  let hasIssues = false;
+  
+  // 检查 commands 目录
+  if (!fs.existsSync(commandsDir)) {
+    logError(`目录不存在: ~/.claude/commands/`);
+    logInfo('  建议: 创建该目录');
+    logInfo(`  命令: mkdir -p "${commandsDir}"`);
+    results.failed++;
+    hasIssues = true;
+  } else {
+    logSuccess('Commands 目录存在');
+    results.passed++;
+  }
+  
+  // 检查 squash-wip 命令文件
+  if (!fs.existsSync(squashWipCommand)) {
+    logError('squash-wip 命令未配置');
+    logInfo('  /squash-wip 命令将无法在 Claude Code 中使用');
+    logInfo('  建议: 重新运行安装脚本或手动创建命令文件');
+    
+    // 检查包中是否有模板文件
+    const templatePath = path.join(getInstallDir(), '.claude', 'commands', 'squash-wip.md');
+    if (fs.existsSync(templatePath)) {
+      logInfo(`  命令: cp "${templatePath}" "${squashWipCommand}"`);
+    } else {
+      logInfo('  或运行: npm install -g claude-code-git-hook');
+    }
+    
+    results.failed++;
+    hasIssues = true;
+  } else {
+    logSuccess('/squash-wip 命令已配置');
+    results.passed++;
+    
+    // 验证命令文件内容
+    try {
+      const content = fs.readFileSync(squashWipCommand, 'utf8');
+      if (!content.includes('cc-git-hook squash-wip')) {
+        logWarning('命令文件内容可能不正确');
+        logInfo('  建议: 检查命令执行部分是否为 "cc-git-hook squash-wip"');
+        results.warnings++;
+        hasIssues = true;
+      }
+    } catch (error) {
+      logWarning('无法读取命令文件');
+      results.warnings++;
+    }
+  }
+  
+  return {
+    success: !hasIssues,
+    commandsDir,
+    squashWipCommand,
+  };
+}
+
+/**
+ * 获取安装目录
+ */
+function getInstallDir() {
+  // 尝试从全局 node_modules 找到包路径
+  try {
+    const { execSync } = require('child_process');
+    const npmRoot = execSync('npm root -g', { encoding: 'utf8' }).trim();
+    return path.join(npmRoot, 'claude-code-git-hook');
+  } catch (error) {
+    // 如果失败，返回备用路径
+    return path.join(os.homedir(), '.claude-code-git-hook');
+  }
+}
+
+/**
  * 主函数
  */
 function main() {
@@ -389,6 +469,7 @@ function main() {
     },
     installations: checkMultipleInstallations(),
     globalHook: checkGlobalHookConfig(),
+    slashCommands: checkSlashCommands(),
     toolConfig: checkToolConfig(),
   };
 

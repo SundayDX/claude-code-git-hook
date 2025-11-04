@@ -89,26 +89,61 @@ async function generateMergedCommitMessage(wipCommits) {
     try {
       logger.debug(`🤖 正在生成合并 commit 消息 (尝试 ${attempt}/${maxRetries})...`);
       
-      const result = await Promise.race([
-        query(prompt),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), timeout)
-        ),
-      ]);
+      // 创建 AbortController 用于超时控制
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), timeout);
       
-      // 清理返回的消息
-      let message = result.trim();
-      
-      // 移除可能的前缀
-      message = message.replace(/^\[AUTO-WIP\]\s*/i, '');
-      
-      // 移除多余的空行
-      message = message.split('\n').filter(line => line.trim().length > 0).join('\n');
-      
-      if (message.length > 0) {
-        return message;
+      try {
+        // 调用 query API，传入正确的参数格式
+        const queryResult = query({ 
+          prompt,
+          options: {
+            abortController,
+            cwd: process.cwd(),
+          }
+        });
+        
+        // 遍历异步生成器获取结果
+        let result = null;
+        for await (const message of queryResult) {
+          if (message.type === 'result') {
+            if (message.subtype === 'success') {
+              result = message.result;
+              break;
+            } else {
+              // 处理错误情况
+              const errorMsg = message.errors?.join(', ') || 'Query failed';
+              throw new Error(errorMsg);
+            }
+          }
+        }
+        
+        clearTimeout(timeoutId);
+        
+        if (!result) {
+          throw new Error('No result from query');
+        }
+        
+        // 清理返回的消息
+        let commitMessage = result.trim();
+        
+        // 移除可能的前缀
+        commitMessage = commitMessage.replace(/^\[AUTO-WIP\]\s*/i, '');
+        
+        // 移除多余的空行
+        commitMessage = commitMessage.split('\n').filter(line => line.trim().length > 0).join('\n');
+        
+        if (commitMessage.length > 0) {
+          return commitMessage;
+        }
+      } catch (innerError) {
+        clearTimeout(timeoutId);
+        throw innerError;
       }
     } catch (error) {
+      // 处理 AbortError 为 Timeout
+      const errorMessage = error.name === 'AbortError' ? 'Timeout' : error.message;
+      
       if (attempt === maxRetries) {
         // 最后一次尝试失败，使用后备方案
         logger.warn(`⚠️ 生成合并 commit 消息失败，使用后备方案: ${error.message}`);
