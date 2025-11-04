@@ -20,97 +20,72 @@
 
 ### 安装方法
 
-#### 方法一：安装脚本（推荐，最简单）
+#### 方法一：一键安装脚本（推荐）
 
-使用一键安装脚本（**自动安装依赖**）：
+使用一键安装脚本，自动使用 npm 全局安装：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SundayDX/claude-code-git-hook/main/scripts/install.sh | bash
 ```
 
 安装脚本会自动：
-- ✅ 下载最新代码
-- ✅ 安装 npm 依赖（`@anthropic-ai/claude-code`）
-- ✅ 配置命令行工具
-- ✅ 设置 Claude Code Hook
+- ✅ 检查 Node.js 和 npm 环境
+- ✅ 从 GitHub 下载最新代码并打包
+- ✅ 使用 `npm install -g` 全局安装
+- ✅ 自动配置 Claude Code Hook
 
-或者从本地项目安装：
+安装后全局可用：
+
+```bash
+cc-git-hook squash-wip [message]  # 合并 WIP commits
+cc-git-hook auto-commit            # 手动运行 auto-commit
+cc-git-hook doctor                 # 诊断工具
+cc-git-hook version                # 显示版本号
+cc-git-hook upgrade                # 升级到最新版本
+cc-git-hook help                   # 显示帮助信息
+```
+
+#### 方法二：手动全局安装
 
 ```bash
 # 克隆项目
 git clone https://github.com/SundayDX/claude-code-git-hook.git
 cd claude-code-git-hook
 
-# 运行安装脚本（自动安装依赖）
+# 打包并全局安装
+npm pack
+npm install -g ./claude-code-git-hook-1.0.0.tgz
+```
+
+或直接使用安装脚本：
+
+```bash
 bash scripts/install.sh
 ```
 
-安装后可以在任何目录使用：
+#### 方法三：NPM 安装（如果已发布）
 
 ```bash
-cc-git-hook squash-wip [message]  # 合并 WIP commits
-cc-git-hook auto-commit            # 手动运行 auto-commit
-cc-git-hook doctor                 # 诊断工具，检查安装和配置状态
-cc-git-hook version                # 显示版本号
-cc-git-hook upgrade                # 检查并升级（自动更新依赖）
-cc-git-hook help                   # 显示帮助信息
+# 如果项目已发布到 npm
+npm install -g claude-code-git-hook
 ```
 
-**注意**：`upgrade` 命令会自动更新 npm 依赖，确保工具始终使用最新版本。
+#### 方法四：本地开发使用
 
-**安装位置说明**：
-- 项目文件安装到：`~/.claude-code-git-hook/`（可通过环境变量 `CC_GIT_HOOK_INSTALL_ROOT` 自定义）
-- 命令符号链接到：`~/.local/bin/cc-git-hook`（可通过环境变量 `CC_GIT_HOOK_BIN_DIR` 自定义）
-- 安装后完全独立，不依赖原始源代码位置
-
-#### 方法二：克隆项目（手动安装）
+如果你正在开发或测试，可以直接运行：
 
 ```bash
+# 克隆项目
 git clone https://github.com/SundayDX/claude-code-git-hook.git
 cd claude-code-git-hook
 
-# 运行安装脚本（推荐）
-bash scripts/install.sh
-```
+# 安装依赖
+npm install
 
-或者手动复制安装：
-
-```bash
-# 1. 复制项目文件到用户目录
-mkdir -p ~/.claude-code-git-hook
-cp -r src ~/.claude-code-git-hook/
-cp package.json ~/.claude-code-git-hook/
-
-# 2. 创建命令符号链接到 PATH
-mkdir -p ~/.local/bin
-ln -s ~/.claude-code-git-hook/src/cc-git-hook.js ~/.local/bin/cc-git-hook
-
-# 3. 确保 ~/.local/bin 在 PATH 中
-export PATH="$HOME/.local/bin:$PATH"
-# 将此行添加到 ~/.bashrc 或 ~/.zshrc 使其永久生效
-```
-
-#### 方法三：直接使用（无需安装）
-
-如果项目已克隆，可以直接使用脚本：
-
-```bash
-# 使用统一入口
+# 直接运行
 node src/cc-git-hook.js squash-wip
 node src/cc-git-hook.js auto-commit
 node src/cc-git-hook.js doctor
-
-# 或直接使用模块（向后兼容）
-node src/auto-commit.js
-node src/splash.js
-```
-
-#### 方法四：NPX 方式（如果发布到 npm）
-
-```bash
-# 如果项目发布到 npm
-npx claude-code-git-hook squash-wip
-npx claude-code-git-hook auto-commit
 ```
 
 ### 配置和验证
@@ -132,25 +107,20 @@ Doctor 命令会自动检查：
 
 安装脚本会自动配置全局 Hook。如果你需要手动配置或使用项目级配置，Doctor 会提供详细的配置说明和修复建议。
 
-**升级安装**：
-
-如果有新版本，可以使用以下方式升级：
+**升级到最新版本**：
 
 ```bash
-# 方法一：使用 upgrade 命令（如果已安装）
+# 方法一：使用内置升级命令（推荐）
 cc-git-hook upgrade
 
-# 方法二：重新运行安装脚本（推荐）
-# 从 GitHub 获取最新版本
+# 方法二：重新运行安装脚本
 curl -fsSL https://raw.githubusercontent.com/SundayDX/claude-code-git-hook/main/scripts/install.sh | bash
 
-# 或从本地项目更新
-cd claude-code-git-hook
-git pull
-bash scripts/install.sh
+# 方法三：使用 npm
+npm update -g claude-code-git-hook
 ```
 
-安装脚本会自动更新 `~/.claude-code-git-hook/` 目录中的文件。
+升级命令会自动从 GitHub 获取最新版本并使用 npm 重新安装。
 
 **Squash WIP 命令**：
 

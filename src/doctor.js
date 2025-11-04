@@ -115,6 +115,47 @@ function checkGit() {
 }
 
 /**
+ * 检查多个安装位置（检测冲突）
+ */
+function checkMultipleInstallations() {
+  const possibleLocations = [
+    '/usr/local/bin/cc-git-hook',
+    `${os.homedir()}/.local/bin/cc-git-hook`,
+    `${os.homedir()}/bin/cc-git-hook`,
+  ];
+  
+  const found = [];
+  
+  for (const location of possibleLocations) {
+    if (fs.existsSync(location)) {
+      try {
+        const realPath = fs.realpathSync(location);
+        found.push({ link: location, target: realPath });
+      } catch (error) {
+        // 忽略错误
+      }
+    }
+  }
+  
+  if (found.length === 0) {
+    logWarning('未找到任何 cc-git-hook 安装');
+    results.warnings++;
+    return { success: false, locations: [] };
+  } else if (found.length === 1) {
+    logSuccess(`安装位置: ${found[0].link} -> ${found[0].target}`);
+    results.passed++;
+    return { success: true, locations: found };
+  } else {
+    logWarning(`检测到多个安装位置（可能冲突）:`);
+    found.forEach(loc => {
+      console.log(`   - ${loc.link} -> ${loc.target}`);
+    });
+    results.warnings++;
+    return { success: false, locations: found, hasConflict: true };
+  }
+}
+
+/**
  * 检查符号链接
  */
 function checkSymlink(commandPath, expectedTarget) {
@@ -334,6 +375,7 @@ function main() {
     commands: {
       ccGitHook: checkCommand('cc-git-hook', 'cc-git-hook'),
     },
+    installations: checkMultipleInstallations(),
     globalHook: checkGlobalHookConfig(),
     toolConfig: checkToolConfig(),
   };
@@ -350,6 +392,19 @@ function main() {
   logError(`失败: ${results.failed}`);
   logWarning(`警告: ${results.warnings}`);
 
+  // 添加多安装位置的警告
+  if (checks.installations.hasConflict) {
+    console.log('');
+    logSection('⚠️  检测到冲突');
+    logWarning('发现多个 cc-git-hook 安装位置！');
+    logInfo('这可能导致执行错误的版本，取决于 PATH 中的目录顺序。');
+    logInfo('');
+    logInfo('建议：');
+    logInfo('1. 卸载所有旧版本: npm uninstall -g claude-code-git-hook');
+    logInfo('2. 删除手动创建的符号链接');
+    logInfo('3. 重新安装: curl -fsSL https://raw.githubusercontent.com/SundayDX/claude-code-git-hook/main/scripts/install.sh | bash');
+  }
+  
   // 生成修复建议
   const suggestions = generateSuggestions(checks);
   if (suggestions.length > 0) {
