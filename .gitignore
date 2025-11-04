@@ -13,5 +13,7 @@ node_modules/
 
 # 测试文件
 test-repos/
+test/test-repo/
+test/test-repo-squash/
 *.test.js
 
