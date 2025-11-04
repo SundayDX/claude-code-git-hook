@@ -248,23 +248,83 @@ HOOK_CONFIG='{
 # 创建 .claude 目录
 mkdir -p "$CLAUDE_DIR"
 
-# 检查配置文件是否存在
-if [ -f "$CLAUDE_SETTINGS" ]; then
-    # 检查是否已包含 hook 配置（支持新旧格式）
-    if grep -q "cc-git-hook auto-commit" "$CLAUDE_SETTINGS" 2>/dev/null || \
-       grep -q "claude-code auto-commit" "$CLAUDE_SETTINGS" 2>/dev/null || \
-       grep -q "claude-code-auto-commit" "$CLAUDE_SETTINGS" 2>/dev/null; then
-        echo "✅ 全局 Hook 配置已存在"
-    else
-        echo "⚠️  全局 Hook 配置已存在，但未包含 cc-git-hook auto-commit"
-        echo "   请手动编辑 $CLAUDE_SETTINGS 添加 hook 配置"
-        echo "   或备份现有配置后运行安装脚本"
-    fi
-else
-    # 创建新的配置文件
-    echo "$HOOK_CONFIG" > "$CLAUDE_SETTINGS"
-    echo "✅ 已创建全局 Hook 配置: $CLAUDE_SETTINGS"
-fi
+# 使用 Node.js 解析和合并 JSON 配置
+# 这个脚本会：
+# 1. 读取现有配置文件（如果存在）
+# 2. 解析 JSON
+# 3. 检查是否已有 hook 配置
+# 4. 如果没有，则合并添加；如果解析失败，则创建新配置
+
+# 设置环境变量供 Node.js 脚本使用
+export CLAUDE_SETTINGS_PATH="$CLAUDE_SETTINGS"
+node << 'EOF'
+const fs = require('fs');
+const path = require('path');
+
+const settingsPath = process.env.CLAUDE_SETTINGS_PATH;
+const hookConfig = {
+  hooks: {
+    Stop: [
+      {
+        hooks: [
+          {
+            type: 'command',
+            command: 'cc-git-hook auto-commit',
+            timeout: 30
+          }
+        ]
+      }
+    ]
+  }
+};
+
+let config = {};
+let fileExists = false;
+
+// 尝试读取现有配置
+if (fs.existsSync(settingsPath)) {
+  fileExists = true;
+  try {
+    const content = fs.readFileSync(settingsPath, 'utf8').trim();
+    if (content) {
+      config = JSON.parse(content);
+    }
+  } catch (error) {
+    // JSON 解析失败，使用空配置
+    console.log('⚠️  配置文件格式错误，将重新创建');
+    config = {};
+  }
+}
+
+// 检查是否已有 hook 配置
+const hasHook = config.hooks && 
+                config.hooks.Stop && 
+                Array.isArray(config.hooks.Stop) &&
+                config.hooks.Stop.length > 0 &&
+                config.hooks.Stop[0].hooks &&
+                config.hooks.Stop[0].hooks.some(hook => 
+                  hook.command && hook.command.includes('cc-git-hook auto-commit')
+                );
+
+if (hasHook) {
+  console.log('✅ 全局 Hook 配置已存在');
+} else {
+  // 合并配置：保留现有配置，添加 hook 配置
+  if (!config.hooks) {
+    config.hooks = {};
+  }
+  config.hooks.Stop = hookConfig.hooks.Stop;
+  
+  // 写入配置
+  fs.writeFileSync(settingsPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+  
+  if (fileExists) {
+    console.log('✅ 已更新全局 Hook 配置:', settingsPath);
+  } else {
+    console.log('✅ 已创建全局 Hook 配置:', settingsPath);
+  }
+}
+EOF
 
 # ============================================================================
 # 安装完成
