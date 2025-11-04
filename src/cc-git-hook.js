@@ -6,6 +6,8 @@
  */
 
 import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 // 命令映射 (使用动态 import)
 const commands = {
@@ -112,7 +114,11 @@ async function main() {
 }
 
 // 如果是直接执行，运行主函数
-if (import.meta.url === `file://${process.argv[1]}`) {
+// 使用 fileURLToPath 和 realpathSync 进行可靠的路径比较
+const currentFile = fileURLToPath(import.meta.url);
+const runFile = fs.realpathSync(process.argv[1]);
+
+if (currentFile === runFile) {
   main().catch(error => {
     console.error('未处理的错误:', error.message);
     if (process.env.DEBUG) {
