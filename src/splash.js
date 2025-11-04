@@ -5,7 +5,7 @@
  * 合并多个 [AUTO-WIP] commits 为一个正式 commit
  */
 
-import { query } from '@anthropic-ai/claude-code';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 import * as gitUtils from './git-utils.js';
 import { execSync } from 'child_process';
 import fs from 'fs';
@@ -63,7 +63,7 @@ function buildMergedPrompt(wipCommits) {
 }
 
 /**
- * 使用 Claude Code SDK 生成合并后的 commit 消息
+ * 使用 Claude Agent SDK 生成合并后的 commit 消息
  * @param {Array<Object>} wipCommits - WIP commit 列表
  * @returns {Promise<string>} 合并后的 commit 消息
  */
@@ -363,7 +363,7 @@ async function main(customMessage) {
   }
   
   // 生成合并后的 commit 消息
-  // 如果提供了自定义消息，使用自定义消息；否则使用 Claude Code SDK 生成
+  // 如果提供了自定义消息，使用自定义消息；否则使用 Claude Agent SDK 生成
   let commitMessage;
   if (customMessage) {
     commitMessage = customMessage;

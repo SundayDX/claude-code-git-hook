@@ -5,7 +5,7 @@
  * 在 Stop 事件时自动创建 [AUTO-WIP] commit
  */
 
-import { query } from '@anthropic-ai/claude-code';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 import * as gitUtils from './git-utils.js';
 import * as config from './config.js';
 import readline from 'readline';
@@ -64,7 +64,7 @@ function askToInitGitRepository() {
 }
 
 /**
- * 使用 Claude Code SDK 生成 commit 消息
+ * 使用 Claude Agent SDK 生成 commit 消息
  * @param {Object} hookInput - Hook 输入
  * @param {string} changes - Git 变更信息
  * @returns {Promise<string>} commit 消息
@@ -81,7 +81,7 @@ async function generateCommitMessage(hookInput, changes) {
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      logger.info(`🤖 正在调用 Claude Code SDK 生成消息 (尝试 ${attempt}/${maxRetries})...`);
+      logger.info(`🤖 正在调用 Claude Agent SDK 生成消息 (尝试 ${attempt}/${maxRetries})...`);
       
       const result = await Promise.race([
         query(prompt),
@@ -295,7 +295,7 @@ async function processHookInput(hookInput) {
       changes = `变更摘要: ${filesSummary || '未知变更'}`;
     }
     
-    // 使用 Claude Code SDK 生成 commit 消息
+    // 使用 Claude Agent SDK 生成 commit 消息
     const commitMessage = await generateCommitMessage(hookInput, changes);
     
     // 创建 commit
