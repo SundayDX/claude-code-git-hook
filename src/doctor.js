@@ -11,6 +11,7 @@ import os from 'os';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import * as version from './version.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -362,6 +363,17 @@ function generateSuggestions(checks) {
 function main() {
   console.log('');
   log('🔍 Claude Code Git Hook Tool - 诊断工具', 'cyan');
+  console.log('='.repeat(60));
+  
+  // 显示版本信息
+  const versionInfo = version.getFullVersionInfo();
+  log(`版本: ${versionInfo.display}`, 'cyan');
+  if (versionInfo.date) {
+    log(`日期: ${versionInfo.date}`, 'cyan');
+  }
+  if (versionInfo.source) {
+    log(`来源: ${versionInfo.source}`, 'cyan');
+  }
   console.log('='.repeat(60));
   console.log('');
 

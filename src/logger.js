@@ -33,6 +33,9 @@ const LOG_LEVELS = {
 function getInstallRoot() {
   // 优先使用环境变量
   if (process.env.CC_GIT_HOOK_INSTALL_ROOT) {
+    if (process.env.DEBUG) {
+      console.error(`[DEBUG] getInstallRoot: 使用环境变量 ${process.env.CC_GIT_HOOK_INSTALL_ROOT}`);
+    }
     return process.env.CC_GIT_HOOK_INSTALL_ROOT;
   }
   
@@ -41,19 +44,34 @@ function getInstallRoot() {
   const currentDir = __dirname;
   const basename = path.basename(currentDir);
   
+  if (process.env.DEBUG) {
+    console.error(`[DEBUG] getInstallRoot: __dirname=${currentDir}, basename=${basename}`);
+  }
+  
   // 如果当前目录名是 'src'，说明在安装目录的 src 子目录下
   if (basename === 'src') {
-    return path.dirname(currentDir);
+    const root = path.dirname(currentDir);
+    if (process.env.DEBUG) {
+      console.error(`[DEBUG] getInstallRoot: 当前目录是 src，使用父目录 ${root}`);
+    }
+    return root;
   }
   
   // 如果当前目录的父目录有 src 子目录，说明在项目根目录
   const parentDir = path.dirname(currentDir);
   if (fs.existsSync(path.join(parentDir, 'src'))) {
+    if (process.env.DEBUG) {
+      console.error(`[DEBUG] getInstallRoot: 父目录有 src 子目录，使用 ${parentDir}`);
+    }
     return parentDir;
   }
   
   // 默认使用用户主目录下的安装目录
-  return path.join(os.homedir(), '.claude-code-git-hook');
+  const defaultRoot = path.join(os.homedir(), '.claude-code-git-hook');
+  if (process.env.DEBUG) {
+    console.error(`[DEBUG] getInstallRoot: 使用默认路径 ${defaultRoot}`);
+  }
+  return defaultRoot;
 }
 
 /**
@@ -109,7 +127,14 @@ function getLogFilePath(configFilePath) {
  */
 function writeToFile(logFilePath, level, ...args) {
   if (!logFilePath) {
+    if (process.env.DEBUG) {
+      console.error(`[DEBUG] writeToFile: logFilePath 为 null，跳过写入`);
+    }
     return;
+  }
+  
+  if (process.env.DEBUG) {
+    console.error(`[DEBUG] writeToFile: 准备写入到 ${logFilePath}`);
   }
   
   try {
@@ -129,11 +154,16 @@ function writeToFile(logFilePath, level, ...args) {
     
     // 追加写入文件
     fs.appendFileSync(logFilePath, logLine, 'utf8');
+    
+    if (process.env.DEBUG) {
+      console.error(`[DEBUG] writeToFile: 写入成功`);
+    }
   } catch (error) {
     // 静默失败，不影响主程序运行
     // 仅在调试模式下输出错误
     if (process.env.DEBUG) {
       console.error(`写入日志文件失败: ${error.message}`);
+      console.error(`错误详情:`, error.stack);
     }
   }
 }
@@ -154,6 +184,10 @@ function createLogger(loggerConfig = null) {
   
   // 获取日志文件路径
   const logFilePath = getLogFilePath(logConfig.filePath);
+  
+  if (process.env.DEBUG) {
+    console.error(`[DEBUG] createLogger: enabled=${enabled}, level=${level}, minLevel=${minLevel}, logFilePath=${logFilePath}`);
+  }
   
   /**
    * 检查是否应该输出日志

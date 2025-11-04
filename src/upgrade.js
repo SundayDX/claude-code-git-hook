@@ -11,6 +11,14 @@ import readline from 'readline';
 import * as version from './version.js';
 
 /**
+ * 升级模式
+ */
+const UPGRADE_MODE = {
+  STABLE: 'stable',   // 升级到最新 release
+  LATEST: 'latest',   // 升级到最新 commit
+};
+
+/**
  * 比较版本号
  * @param {string} v1 - 版本1
  * @param {string} v2 - 版本2
@@ -32,7 +40,7 @@ function compareVersions(v1, v2) {
 }
 
 /**
- * 从 GitHub API 获取最新版本
+ * 从 GitHub API 获取最新版本（release）
  * @returns {Promise<string|null>} 最新版本号
  */
 function getLatestVersion() {
@@ -73,6 +81,98 @@ function getLatestVersion() {
       reject(error);
     });
   });
+}
+
+/**
+ * 从 GitHub API 获取最新 commit 信息
+ * @param {string} branch - 分支名称（默认 main）
+ * @returns {Promise<Object>} commit 信息对象
+ */
+function getLatestCommit(branch = 'main') {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'api.github.com',
+      path: `/repos/SundayDX/claude-code-git-hook/commits/${branch}`,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'cc-git-hook',
+        'Accept': 'application/vnd.github.v3+json',
+      },
+    };
+
+    https.get(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          try {
+            const commit = JSON.parse(data);
+            resolve({
+              sha: commit.sha,
+              shortSha: commit.sha.substring(0, 7),
+              message: commit.commit.message.split('\n')[0],
+              date: commit.commit.author.date,
+              author: commit.commit.author.name,
+            });
+          } catch (error) {
+            reject(new Error('无法解析 commit 信息'));
+          }
+        } else {
+          reject(new Error(`GitHub API 错误: ${res.statusCode}`));
+        }
+      });
+    }).on('error', (error) => {
+      reject(error);
+    });
+  });
+}
+
+/**
+ * 比较本地 hash 和远程 commit
+ * @param {string} localHash - 本地 commit hash
+ * @param {Object} remoteCommit - 远程 commit 信息
+ * @returns {Object} 比较结果
+ */
+function compareWithCommit(localHash, remoteCommit) {
+  if (!localHash) {
+    return {
+      needsUpdate: true,
+      reason: '无法获取本地版本信息',
+    };
+  }
+
+  if (!remoteCommit || !remoteCommit.sha) {
+    return {
+      needsUpdate: false,
+      reason: '无法获取远程版本信息',
+    };
+  }
+
+  // 比较完整 hash 或短 hash
+  const localShort = localHash.substring(0, 7);
+  const remoteShort = remoteCommit.shortSha || remoteCommit.sha.substring(0, 7);
+
+  if (localHash === remoteCommit.sha || localShort === remoteShort) {
+    return {
+      needsUpdate: false,
+      reason: '已是最新版本',
+      upToDate: true,
+    };
+  }
+
+  // 不同的 hash，需要更新
+  return {
+    needsUpdate: true,
+    reason: '发现新的提交',
+    localHash: localShort,
+    remoteHash: remoteShort,
+    remoteMessage: remoteCommit.message,
+    remoteDate: remoteCommit.date,
+  };
 }
 
 /**
@@ -144,26 +244,82 @@ async function performUpgrade() {
  * 主函数
  */
 async function main() {
+  // 解析命令行参数
+  const args = process.argv.slice(2);
+  let mode = UPGRADE_MODE.STABLE; // 默认模式：稳定版
+  
+  if (args.includes('--latest') || args.includes('-l')) {
+    mode = UPGRADE_MODE.LATEST;
+  } else if (args.includes('--stable') || args.includes('-s')) {
+    mode = UPGRADE_MODE.STABLE;
+  }
+  
   console.log('🔍 检查更新...\n');
   
-  const currentVersion = version.getVersion();
-  console.log(`当前版本: v${currentVersion}`);
+  const versionInfo = version.getFullVersionInfo();
+  console.log(`当前版本: ${versionInfo.display}`);
+  if (versionInfo.date) {
+    console.log(`构建日期: ${versionInfo.date}`);
+  }
+  console.log('');
   
-  try {
-    const latestVersion = await getLatestVersion();
-    console.log(`最新版本: v${latestVersion}`);
-    
-    const comparison = compareVersions(currentVersion, latestVersion);
-    
-    if (comparison >= 0) {
-      console.log('\n✅ 已是最新版本！');
-      process.exit(0);
+  let needsUpdate = false;
+  let updateInfo = {};
+  
+  if (mode === UPGRADE_MODE.LATEST) {
+    // 检查最新 commit
+    console.log('检查模式: 最新开发版 (--latest)');
+    try {
+      const latestCommit = await getLatestCommit();
+      console.log(`最新提交: ${latestCommit.shortSha}`);
+      console.log(`提交信息: ${latestCommit.message}`);
+      console.log(`提交日期: ${new Date(latestCommit.date).toISOString().split('T')[0]}`);
+      
+      const comparison = compareWithCommit(versionInfo.fullHash || versionInfo.hash, latestCommit);
+      
+      if (comparison.upToDate) {
+        console.log('\n✅ 已是最新版本！');
+        process.exit(0);
+      } else if (comparison.needsUpdate) {
+        console.log('\n🆕 发现新的提交！');
+        needsUpdate = true;
+        updateInfo = { mode: UPGRADE_MODE.LATEST, commit: latestCommit };
+      }
+    } catch (error) {
+      console.log('\n⚠️  无法获取最新 commit 信息:', error.message);
+      console.log('将尝试升级到最新版本...\n');
+      needsUpdate = true;
+      updateInfo = { mode: UPGRADE_MODE.LATEST };
     }
+  } else {
+    // 检查最新 release
+    console.log('检查模式: 稳定版 (默认)');
+    console.log('提示: 使用 --latest 可检查最新开发版\n');
     
-    console.log('\n🆕 发现新版本！');
-  } catch (error) {
-    console.log('\n⚠️  无法获取最新版本信息:', error.message);
-    console.log('将尝试升级到最新版本...\n');
+    try {
+      const latestVersion = await getLatestVersion();
+      console.log(`最新稳定版: v${latestVersion}`);
+      
+      const comparison = compareVersions(versionInfo.version, latestVersion);
+      
+      if (comparison >= 0) {
+        console.log('\n✅ 已是最新稳定版！');
+        process.exit(0);
+      }
+      
+      console.log('\n🆕 发现新版本！');
+      needsUpdate = true;
+      updateInfo = { mode: UPGRADE_MODE.STABLE, version: latestVersion };
+    } catch (error) {
+      console.log('\n⚠️  无法获取最新版本信息:', error.message);
+      console.log('将尝试升级到最新版本...\n');
+      needsUpdate = true;
+      updateInfo = { mode: UPGRADE_MODE.STABLE };
+    }
+  }
+  
+  if (!needsUpdate) {
+    process.exit(0);
   }
   
   // 询问是否升级
@@ -187,7 +343,11 @@ async function main() {
       }
     } else {
       console.log('\n已取消升级。');
-      console.log('如需升级，请运行: cc-git-hook upgrade');
+      if (mode === UPGRADE_MODE.LATEST) {
+        console.log('如需升级到最新开发版，请运行: cc-git-hook upgrade --latest');
+      } else {
+        console.log('如需升级到最新稳定版，请运行: cc-git-hook upgrade');
+      }
       process.exit(0);
     }
   });
@@ -207,5 +367,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 export {
   main,
   getLatestVersion,
+  getLatestCommit,
   compareVersions,
+  compareWithCommit,
+  UPGRADE_MODE,
 };

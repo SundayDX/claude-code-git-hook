@@ -11,6 +11,9 @@ node_modules/
 .claude-git-hook.json
 .claude/settings.local.json
 
+# 自动生成的版本文件（发布时生成，不提交到仓库）
+src/VERSION.json
+
 # 测试文件
 test-repos/
 test/test-repo/

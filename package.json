@@ -13,7 +13,8 @@
     "test:squash-wip": "node test/test-squash-wip.js",
     "test:all": "node test/run-all-tests.js",
     "version": "node -e \"console.log(require('./package.json').version)\"",
-    "prepublishOnly": "npm test",
+    "generate-version": "node scripts/generate-version.js",
+    "prepublishOnly": "npm run generate-version && npm test",
     "postinstall": "echo '✅ claude-code-git-hook installed successfully! Run cc-git-hook doctor to verify.'"
   },
   "keywords": [
